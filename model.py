@@ -4,17 +4,17 @@ import torch.nn.functional as F
 
 class UNet(nn.Module):
     
-    def __init__(self, n_channels, n_classes):
+    def __init__(self, n_channels, n_classes, bilinear):
         super(UNet, self).__init__()
         self.inc = inconv(n_channels, 64)
         self.down1 = down(64, 128)
         self.down2 = down(128, 256)
         self.down3 = down(256, 512)
         self.down4 = down(512, 512)
-        self.up1 = up(1024, 256)
-        self.up2 = up(512, 128)
-        self.up3 = up(256, 64)
-        self.up4 = up(128, 64)
+        self.up1 = up(1024, 256, bilinear)
+        self.up2 = up(512, 128, bilinear)
+        self.up3 = up(256, 64, bilinear)
+        self.up4 = up(128, 64, bilinear)
         self.outc = outconv(64, n_classes)
     
     def forward(self, x):
@@ -76,7 +76,7 @@ class down(nn.Module):
 
 class up(nn.Module):
     ''' upsample -> conv '''
-    def __init__(self, in_ch, out_ch, bilinear=True):
+    def __init__(self, in_ch, out_ch, bilinear=False):
         super(up, self).__init__()
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)

@@ -19,11 +19,15 @@ class Instructor:
         else:
             self.trainset = ImageDataset(fdir=opt.impaths['train'], bdir=opt.impaths['btrain'], imsize=opt.imsize, mode='train', aug_prob=opt.aug_prob)
             self.valset = ImageDataset(fdir=opt.impaths['val'], bdir=opt.impaths['bval'], imsize=opt.imsize, mode='val', aug_prob=opt.aug_prob)
-        self.model = UNet(n_channels=3, n_classes=1).to(opt.device)
+        self.model = UNet(n_channels=3, n_classes=1, bilinear=self.opt.use_bilinear)
+        if torch.cuda.device_count() > 1:
+            self.model = torch.nn.DataParallel(self.model)
+        self.model = self.model.to(opt.device)
         if opt.checkpoint:
             self.model.load_state_dict(torch.load('./state_dict/{:s}'.format(opt.checkpoint)))
+            print('checkpoint {:s} has been loaded'.format(opt.checkpoint))
         self._print_args()
-        
+    
     def _print_args(self):
         n_trainable_params, n_nontrainable_params = 0, 0
         for p in self.model.parameters():
@@ -50,7 +54,7 @@ class Instructor:
     
     def _update_records(self, epoch, train_loss, val_loss, val_dice):
         if val_dice > self.records['best_dice']:
-            path = './state_dict/dice{:.4f}_temp{:s}.pt'.format(val_dice, str(time.time())[-6:])
+            path = './state_dict/{:s}_dice{:.4f}_temp{:s}.pt'.format(self.opt.model_name, val_dice, str(time.time())[-6:])
             torch.save(self.model.state_dict(), path)
             self.records['best_epoch'] = epoch
             self.records['best_dice'] = val_dice
@@ -64,7 +68,7 @@ class Instructor:
         print('best epoch: {:d}'.format(self.records['best_epoch']))
         print('best train loss: {:.4f}, best val loss: {:.4f}'.format(min(self.records['train_loss']), min(self.records['val_loss'])))
         print('best val dice {:.4f}'.format(self.records['best_dice']))
-        os.rename(self.records['checkpoints'][-1], './state_dict/dice{:.4f}_save{:s}.pt'.format(self.records['best_dice'], timestamp))
+        os.rename(self.records['checkpoints'][-1], './state_dict/{:s}_dice{:.4f}_save{:s}.pt'.format(self.opt.model_name, self.records['best_dice'], timestamp))
         for path in self.records['checkpoints'][0:-1]:
             os.remove(path)
         # Draw figures
@@ -142,8 +146,7 @@ class Instructor:
                 index, inputs = sample_batched[0], sample_batched[1]
                 inputs = inputs.to(self.opt.device)
                 predict = self.model(inputs)
-                predict = (predict > 0.5).cpu().numpy()
-                self.testset.save_img(index.item(), predict[0][0])
+                self.testset.save_img(index.item(), predict, self.opt.use_crf)
                 ratio = int((i_batch+1)*50/n_batch)
                 sys.stdout.write("\r["+">"*ratio+" "*(50-ratio)+"] {}/{} {:.2f}%".format(i_batch+1, n_batch, (i_batch+1)*100/n_batch))
                 sys.stdout.flush()
@@ -167,18 +170,21 @@ if __name__ == '__main__':
     ''' Basic '''
     parser.add_argument('--impath', default='shoe_dataset', type=str)
     parser.add_argument('--imsize', default=256, type=int)
-    parser.add_argument('--aug_prob', default=0.4, type=float)
-    parser.add_argument('--batch_size', default=8, type=int)
-    parser.add_argument('--num_epoch', default=50, type=int)
+    parser.add_argument('--aug_prob', default=0.5, type=float)
+    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--num_epoch', default=100, type=int)
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--l2reg', default=1e-5, type=float)
+    parser.add_argument('--use_bilinear', default=False, type=float)
     parser.add_argument('--inference', default=False, type=bool)
+    parser.add_argument('--use_crf', default=True, type=bool)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--backend', default=False, type=bool)
     parser.add_argument('--device', default=None, type=str, help='cpu, cuda')
     opt = parser.parse_args()
     
+    opt.model_name = 'unet' if opt.use_bilinear else 'unet_bilinear'
     opt.optimizer = optimizers[opt.optimizer]
     opt.device = torch.device(opt.device) if opt.device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
