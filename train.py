@@ -17,15 +17,15 @@ class Instructor:
         if opt.inference:
             self.testset = TestImageDataset(fdir=opt.impaths['test'], imsize=opt.imsize)
         else:
-            self.trainset = ImageDataset(fdir=opt.impaths['train'], bdir=opt.impaths['btrain'], imsize=opt.imsize, mode='train', aug_prob=opt.aug_prob)
-            self.valset = ImageDataset(fdir=opt.impaths['val'], bdir=opt.impaths['bval'], imsize=opt.imsize, mode='val', aug_prob=opt.aug_prob)
+            self.trainset = ImageDataset(fdir=opt.impaths['train'], bdir=opt.impaths['btrain'], imsize=opt.imsize, mode='train', aug_prob=opt.aug_prob, prefetch=opt.prefetch)
+            self.valset = ImageDataset(fdir=opt.impaths['val'], bdir=opt.impaths['bval'], imsize=opt.imsize, mode='val', aug_prob=opt.aug_prob, prefetch=opt.prefetch)
         self.model = UNet(n_channels=3, n_classes=1, bilinear=self.opt.use_bilinear)
-        if torch.cuda.device_count() > 1:
+        if opt.checkpoint:
+            self.model.load_state_dict(torch.load('./state_dict/{:s}'.format(opt.checkpoint), map_location=self.opt.device))
+            print('checkpoint {:s} has been loaded'.format(opt.checkpoint))
+        if opt.multi_gpu:
             self.model = torch.nn.DataParallel(self.model)
         self.model = self.model.to(opt.device)
-        if opt.checkpoint:
-            self.model.load_state_dict(torch.load('./state_dict/{:s}'.format(opt.checkpoint)))
-            print('checkpoint {:s} has been loaded'.format(opt.checkpoint))
         self._print_args()
     
     def _print_args(self):
@@ -55,7 +55,10 @@ class Instructor:
     def _update_records(self, epoch, train_loss, val_loss, val_dice):
         if val_dice > self.records['best_dice']:
             path = './state_dict/{:s}_dice{:.4f}_temp{:s}.pt'.format(self.opt.model_name, val_dice, str(time.time())[-6:])
-            torch.save(self.model.state_dict(), path)
+            if self.opt.multi_gpu:
+                torch.save(self.model.module.state_dict(), path)
+            else:
+                torch.save(self.model.state_dict(), path)
             self.records['best_epoch'] = epoch
             self.records['best_dice'] = val_dice
             self.records['checkpoints'].append(path)
@@ -181,12 +184,15 @@ if __name__ == '__main__':
     parser.add_argument('--use_crf', default=True, type=bool)
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--backend', default=False, type=bool)
+    parser.add_argument('--prefetch', default=False, type=bool)
     parser.add_argument('--device', default=None, type=str, help='cpu, cuda')
+    parser.add_argument('--multi_gpu', default=None, type=bool)
     opt = parser.parse_args()
     
-    opt.model_name = 'unet' if opt.use_bilinear else 'unet_bilinear'
+    opt.model_name = 'unet_bilinear' if opt.use_bilinear else 'unet'
     opt.optimizer = optimizers[opt.optimizer]
     opt.device = torch.device(opt.device) if opt.device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    opt.multi_gpu = opt.multi_gpu if opt.multi_gpu else bool(torch.cuda.device_count() > 1)
     
     opt.impaths = {
         'train': os.path.join('.', opt.impath, 'train'),
