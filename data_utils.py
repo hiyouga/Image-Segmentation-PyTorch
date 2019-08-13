@@ -8,23 +8,23 @@ from torch.utils.data import Dataset
 from torchvision import transforms as T
 from torchvision.transforms import functional as TF
 
-def dense_crf(img, output_probs):
-    h = output_probs.shape[0]
-    w = output_probs.shape[1]
+def dense_crf(inputs, predict_probs):
+    h = predict_probs.shape[0]
+    w = predict_probs.shape[1]
     
-    output_probs = np.expand_dims(output_probs, 0)
-    output_probs = np.append(1 - output_probs, output_probs, axis=0)
+    predict_probs = np.expand_dims(predict_probs, 0)
+    predict_probs = np.append(1 - predict_probs, predict_probs, axis=0)
     
     d = densecrf.DenseCRF2D(w, h, 2)
-    U = -np.log(output_probs)
+    U = -np.log(predict_probs)
     U = U.reshape((2, -1))
     U = np.ascontiguousarray(U)
-    img = np.ascontiguousarray(img)
+    inputs = np.ascontiguousarray(inputs)
     
     d.setUnaryEnergy(U)
     
     d.addPairwiseGaussian(sxy=20, compat=3)
-    d.addPairwiseBilateral(sxy=30, srgb=20, rgbim=img, compat=10)
+    d.addPairwiseBilateral(sxy=30, srgb=20, rgbim=inputs, compat=10)
     
     Q = d.inference(5)
     Q = np.argmax(np.array(Q), axis=0).reshape((h, w))
@@ -99,7 +99,7 @@ class ImageDataset(Dataset):
             Transform.append(T.RandomRotation((rot_deg, rot_deg)))
             rot_range = random.randint(-10, 10)
             Transform.append(T.RandomRotation((rot_range, rot_range)))
-            crop_range = random.randint(250, 270)
+            crop_range = random.randint(270, 300)
             Transform.append(T.CenterCrop((int(crop_range * aspect_ratio), crop_range)))
             Transform = T.Compose(Transform)
             img = Transform(img)
@@ -152,8 +152,8 @@ class TestImageDataset(Dataset):
     def save_img(self, index, predict, use_crf):
         predict = predict.squeeze().cpu().numpy()
         if use_crf:
-            img = self._dataset[index].permute(1, 2, 0).numpy()
-            predict = dense_crf(np.array(img).astype(np.uint8), predict)
+            inputs = self._dataset[index].permute(1, 2, 0).numpy()
+            predict = dense_crf(np.array(inputs).astype(np.uint8), predict)
         predict = np.array((predict > 0.5) * 255).astype(np.uint8)
         mask = Image.fromarray(predict, mode='L')
         mask = mask.resize(self._osize[index])

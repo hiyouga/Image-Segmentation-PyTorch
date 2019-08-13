@@ -77,8 +77,8 @@ class Instructor:
         # Draw figures
         plt.figure()
         trainloss, = plt.plot(self.records['train_loss'])
-        testloss, = plt.plot(self.records['val_loss'])
-        plt.legend([trainloss, testloss], ['train', 'val'], loc='upper right')
+        valloss, = plt.plot(self.records['val_loss'])
+        plt.legend([trainloss, valloss], ['train', 'val'], loc='upper right')
         plt.title('{:s} loss curve'.format(timestamp))
         plt.savefig('./figs/{:s}_loss.png'.format(timestamp), format='png', transparent=True, dpi=300)
         plt.figure()
@@ -146,8 +146,7 @@ class Instructor:
         n_batch = len(test_dataloader)
         with torch.no_grad():
             for i_batch, sample_batched in enumerate(test_dataloader):
-                index, inputs = sample_batched[0], sample_batched[1]
-                inputs = inputs.to(self.opt.device)
+                index, inputs = sample_batched[0], sample_batched[1].to(self.opt.device)
                 predict = self.model(inputs)
                 self.testset.save_img(index.item(), predict, self.opt.use_crf)
                 ratio = int((i_batch+1)*50/n_batch)
