@@ -23,7 +23,7 @@ class Instructor:
         if opt.checkpoint:
             self.model.load_state_dict(torch.load('./state_dict/{:s}'.format(opt.checkpoint), map_location=self.opt.device))
             print('checkpoint {:s} has been loaded'.format(opt.checkpoint))
-        if opt.multi_gpu:
+        if opt.multi_gpu == 'on':
             self.model = torch.nn.DataParallel(self.model)
         self.model = self.model.to(opt.device)
         self._print_args()
@@ -55,7 +55,7 @@ class Instructor:
     def _update_records(self, epoch, train_loss, val_loss, val_dice):
         if val_dice > self.records['best_dice']:
             path = './state_dict/{:s}_dice{:.4f}_temp{:s}.pt'.format(self.opt.model_name, val_dice, str(time.time())[-6:])
-            if self.opt.multi_gpu:
+            if self.opt.multi_gpu == 'on':
                 torch.save(self.model.module.state_dict(), path)
             else:
                 torch.save(self.model.state_dict(), path)
@@ -170,29 +170,32 @@ if __name__ == '__main__':
     
     # Hyperparameters
     parser = argparse.ArgumentParser()
-    ''' Basic '''
+    ''' For dataset '''
     parser.add_argument('--impath', default='shoe_dataset', type=str)
     parser.add_argument('--imsize', default=256, type=int)
     parser.add_argument('--aug_prob', default=0.5, type=float)
+    ''' For training '''
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_epoch', default=100, type=int)
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--l2reg', default=1e-5, type=float)
     parser.add_argument('--use_bilinear', default=False, type=float)
+    ''' For inference '''
     parser.add_argument('--inference', default=False, type=bool)
     parser.add_argument('--use_crf', default=True, type=bool)
     parser.add_argument('--checkpoint', default=None, type=str)
+    ''' For environment '''
     parser.add_argument('--backend', default=False, type=bool)
     parser.add_argument('--prefetch', default=False, type=bool)
     parser.add_argument('--device', default=None, type=str, help='cpu, cuda')
-    parser.add_argument('--multi_gpu', default=None, type=bool)
+    parser.add_argument('--multi_gpu', default=None, type=str, help='on, off')
     opt = parser.parse_args()
     
     opt.model_name = 'unet_bilinear' if opt.use_bilinear else 'unet'
     opt.optimizer = optimizers[opt.optimizer]
     opt.device = torch.device(opt.device) if opt.device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    opt.multi_gpu = opt.multi_gpu if opt.multi_gpu else bool(torch.cuda.device_count() > 1)
+    opt.multi_gpu = opt.multi_gpu if opt.multi_gpu else 'on' if torch.cuda.device_count() > 1 else 'off'
     
     opt.impaths = {
         'train': os.path.join('.', opt.impath, 'train'),
