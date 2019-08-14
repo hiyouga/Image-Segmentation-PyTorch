@@ -182,7 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_bilinear', default=False, type=float)
     ''' For inference '''
     parser.add_argument('--inference', default=False, type=bool)
-    parser.add_argument('--use_crf', default=True, type=bool)
+    parser.add_argument('--use_crf', default=False, type=bool)
     parser.add_argument('--checkpoint', default=None, type=str)
     ''' For environment '''
     parser.add_argument('--backend', default=False, type=bool)
