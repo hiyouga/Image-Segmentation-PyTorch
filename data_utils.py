@@ -80,12 +80,12 @@ class ImageDataset(Dataset):
         img = Image.merge('RGB', (ch_r, ch_g, ch_b))
         mask = ch_a
         ''' Add background '''
-        if random.random() < 0.75:
-            bg = Image.new('RGB', img.size, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-            bg.paste(img, mask=mask)
-        else:
+        if random.random() < 0.25 and len(self._bgpaths):
             bg = Image.open(self._bgpaths[random.randint(0, len(self._bgpaths)-1)])
             bg = bg.resize(img.size)
+            bg.paste(img, mask=mask)
+        else:
+            bg = Image.new('RGB', img.size, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
             bg.paste(img, mask=mask)
         img = bg
         ''' Do transformation '''
