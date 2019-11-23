@@ -50,7 +50,7 @@ Ronneberger, O., Fischer, P., and Brox, T. 2015. U-Net: Convolutional Networks f
 
 ## Notes
 
-The model has be trained from scratch on Tesla V100 32GB*4. Training the model takes 3.6GB of memory and predicting images takes 1.3GB. If you don't have enough GPU memory, consider using bilinear up-sampling rather than transposed convolution in the model.
+The model was trained from scratch on Tesla V100 32GB*4. Training the model takes 3.6GB of memory and predicting images takes 1.3GB. If you don't have enough GPU memory, consider using bilinear up-sampling rather than transposed convolution in the model.
 
 ## Acknowledgements
 
